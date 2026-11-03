@@ -1,0 +1,1 @@
+This is plain text pretending to be a JPEG. The API must reject it by checking the real file content.
