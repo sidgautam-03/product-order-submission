@@ -8,11 +8,23 @@ import { processPending } from './services/email.service.js';
 
 if (!env.SMTP_HOST) throw new Error('Missing env variable: SMTP_HOST');
 
+// With the Ethereal host and no credentials, create a throwaway Ethereal account so test emails work out of the box.
+// Each sent message is then viewable through the previewUrl in the email log.
+let { SMTP_USER: user, SMTP_PASS: pass } = env;
+if (!user && env.SMTP_HOST === 'smtp.ethereal.email') {
+  try {
+    ({ user, pass } = await nodemailer.createTestAccount());
+    logger.info({ user }, 'Created a temporary Ethereal account; open the previewUrl logged for each sent email to read it');
+  } catch (err) {
+    logger.warn({ err }, 'Could not create an Ethereal account; set SMTP_USER and SMTP_PASS');
+  }
+}
+
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: env.SMTP_PORT,
   secure: env.SMTP_PORT === 465,
-  auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+  auth: user ? { user, pass } : undefined,
 });
 
 async function send(mail) {

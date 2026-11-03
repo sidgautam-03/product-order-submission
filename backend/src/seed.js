@@ -3,7 +3,11 @@ import mongoose from 'mongoose';
 import { z } from 'zod';
 import { env } from './config/env.js';
 import { connectDB } from './config/db.js';
+import { Product } from './model/Product.js';
 import { User, ROLES } from './model/User.js';
+import { deleteImages, storeImages } from './utils/images.js';
+import { rupeesToPaise } from './utils/money.js';
+import { PRODUCTS, makePng } from './seedData.js';
 
 const adminSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email()),
@@ -19,6 +23,11 @@ async function seed() {
 
   await connectDB();
 
+  await seedAdmin(email, password);
+  await seedProducts();
+}
+
+async function seedAdmin(email, password) {
   const existing = await User.findOne({ email });
   if (existing) {
     // never overwrite an existing account's password or silently promote a customer
@@ -32,6 +41,35 @@ async function seed() {
   const passwordHash = await bcrypt.hash(password, 12);
   await User.create({ name: 'Admin', email, passwordHash, role: ROLES.ADMIN, emailVerified: true, emailVerifiedAt: new Date() });
   console.log(`Admin ${email} created`);
+}
+
+// a product is skipped when a live one with the same name (ignoring case) exists, so re-running adds nothing
+async function seedProducts() {
+  let created = 0;
+  for (const p of PRODUCTS) {
+    const exists = await Product.exists({ name: p.name, isArchived: false }).collation({ locale: 'en', strength: 2 });
+    if (exists) continue;
+    const images = [0, 1].map((variant) => {
+      const buffer = makePng(p.color, variant);
+      return { buffer, mimeType: 'image/png', ext: 'png', size: buffer.length };
+    });
+    const stored = await storeImages(images);
+    try {
+      await Product.create({
+        name: p.name,
+        description: p.description,
+        pricePaise: rupeesToPaise(p.price),
+        category: p.category,
+        stock: p.stock,
+        images: stored,
+      });
+      created++;
+    } catch (err) {
+      await deleteImages(stored);
+      throw err;
+    }
+  }
+  console.log(`Products: ${created} created, ${PRODUCTS.length - created} already existed`);
 }
 
 seed()

@@ -1,0 +1,68 @@
+# Run everything with: docker compose up --build
+# Settings come from backend/.env.example (never a real .env); only values that must differ in Docker are set here.
+services:
+  mongo:
+    image: mongo:7
+    # single-node replica set: orders use multi-document transactions, which need one
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      # healthy only once this node is PRIMARY; the first run also initiates the replica set
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { if (rs.status().myState === 1) quit(0); quit(1) } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }); quit(1) }"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    env_file: ./backend/.env.example
+    environment:
+      MONGO_URI: mongodb://mongo:27017/product-order?replicaSet=rs0
+    ports:
+      - "5000:5000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    command: ["npm", "run", "worker"]
+    env_file: ./backend/.env.example
+    environment:
+      MONGO_URI: mongodb://mongo:27017/product-order?replicaSet=rs0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:5000
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  uploads:

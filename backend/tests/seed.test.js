@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcrypt';
 import { setup } from './helpers.js';
 
-let t, User;
+let t, User, Product;
 
 beforeAll(async () => {
   t = await setup();
-  ({ User } = t.models);
+  ({ User, Product } = t.models);
 }, 120000);
 
 afterAll(() => t.teardown());
@@ -44,4 +44,17 @@ test('refuses to touch an existing customer account and rejects weak config', as
 
   const weak = runSeed({ ADMIN_PASSWORD: 'short' });
   expect(weak.status).toBe(1);
+}, 60000);
+
+test('seeds 12 products with images across 3 categories and does not duplicate them on a second run', async () => {
+  expect(runSeed().status).toBe(0);
+  expect(runSeed().status).toBe(0);
+
+  const products = await Product.find();
+  expect(products).toHaveLength(12);
+  expect(new Set(products.map((p) => p.category)).size).toBe(3);
+  for (const p of products) {
+    expect(p.images.length).toBeGreaterThanOrEqual(1);
+    expect(p.pricePaise).toBeGreaterThan(0);
+  }
 }, 60000);

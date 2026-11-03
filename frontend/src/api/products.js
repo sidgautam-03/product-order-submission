@@ -38,7 +38,7 @@ export const getProduct = (id, signal) =>
   client.get(`/api/products/${id}`, { signal }).then((r) => normalizeProduct(r.data.product ?? r.data))
 
 export const saveProduct = (id, formData) =>
-  (id ? client.put(`/api/products/${id}`, formData) : client.post('/api/products', formData)).then(
+  (id ? client.patch(`/api/products/${id}`, formData) : client.post('/api/products', formData)).then(
     (r) => normalizeProduct(r.data.product ?? r.data),
   )
 

@@ -88,7 +88,7 @@ function ProductForm({ product }) {
     body.append('price', values.price)
     body.append('stock', values.stock)
     body.append('category', values.category.trim())
-    removed.forEach((id) => body.append('removeImages', id))
+    removed.forEach((id) => body.append('removeImageIds', id))
     added.forEach((a) => body.append('images', a.file))
 
     setSubmitting(true)

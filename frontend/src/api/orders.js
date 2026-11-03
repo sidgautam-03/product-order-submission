@@ -33,10 +33,10 @@ export const createOrder = (body, idempotencyKey) =>
     .post('/api/orders', body, { headers: { 'Idempotency-Key': idempotencyKey } })
     .then((r) => normalizeOrder(r.data.order ?? r.data))
 
-export const cancelOrder = (id) => client.post(`/api/orders/${id}/cancel`).then((r) => r.data)
+export const cancelOrder = (id) => client.patch(`/api/orders/${id}`, { status: 'Cancelled' }).then((r) => r.data)
 
 export const updateOrderStatus = (id, status) =>
-  client.patch(`/api/orders/${id}/status`, { status }).then((r) => r.data)
+  client.patch(`/api/orders/${id}`, { status }).then((r) => r.data)
 
 // Pulls [{productId, available, requested}] out of a 409 body, whatever key the API uses.
 export function extractStockConflicts(data) {
